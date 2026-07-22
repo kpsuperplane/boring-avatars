@@ -4,6 +4,8 @@ export {
   beamFacePose,
   beamGazePose,
   beamMouthPose,
+  beamOriginalIdleTransforms,
+  beamShortestRotationTransform,
   beamRestingMouthPaths,
   beamShadowOpacity,
   beamShadowPose,

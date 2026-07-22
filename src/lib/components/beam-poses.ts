@@ -1,4 +1,133 @@
+import { getUnit } from '../utilities';
 import type { AvatarActivity } from './types';
+
+const ORIGINAL_BEAM_SIZE = 36;
+const ROOM_BEAM_SIZE = 68;
+const VIEWBOX_SIZE = 100;
+const ROOM_BEAM_X = 16;
+const ROOM_BEAM_Y = 18;
+const CHARACTER_ORIGIN_X = 50;
+const CHARACTER_ORIGIN_Y = 52;
+
+const motionNumber = (value: number) => Number(value.toFixed(3));
+
+type Matrix = [number, number, number, number, number, number];
+
+const multiply = (left: Matrix, right: Matrix): Matrix => [
+  left[0] * right[0] + left[2] * right[1],
+  left[1] * right[0] + left[3] * right[1],
+  left[0] * right[2] + left[2] * right[3],
+  left[1] * right[2] + left[3] * right[3],
+  left[0] * right[4] + left[2] * right[5] + left[4],
+  left[1] * right[4] + left[3] * right[5] + left[5],
+];
+
+const translate = (x: number, y: number): Matrix => [1, 0, 0, 1, x, y];
+const scale = (amount: number): Matrix => [amount, 0, 0, amount, 0, 0];
+const rotate = (degrees: number, x: number, y: number): Matrix => {
+  const radians = (degrees * Math.PI) / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  return multiply(
+    multiply(translate(x, y), [cosine, sine, -sine, cosine, 0, 0]),
+    translate(-x, -y),
+  );
+};
+const inverse = ([a, b, c, d, e, f]: Matrix): Matrix => {
+  const determinant = a * d - b * c;
+  return [
+    d / determinant,
+    -b / determinant,
+    -c / determinant,
+    a / determinant,
+    (c * f - d * e) / determinant,
+    (b * e - a * f) / determinant,
+  ];
+};
+const cssTransform = ([a, b, c, d, e, f]: Matrix) => {
+  const rotation = (Math.atan2(b, a) * 180) / Math.PI;
+  const scaleX = Math.hypot(a, b);
+  const scaleY = (a * d - b * c) / scaleX;
+  const scaleValue =
+    Math.abs(scaleX - scaleY) < 0.0001
+      ? `${motionNumber(scaleX)}`
+      : `${motionNumber(scaleX)}, ${motionNumber(scaleY)}`;
+  return `translate(${motionNumber(e)}px, ${motionNumber(f)}px) rotate(${motionNumber(rotation)}deg) scale(${scaleValue})`;
+};
+
+export const beamShortestRotationTransform = (transform: string) => {
+  const match = transform.match(/^matrix\(([^)]+)\)$/);
+  if (!match) return transform;
+  const values = match[1].split(',').map(Number);
+  if (values.length !== 6 || values.some((value) => !Number.isFinite(value))) return transform;
+  return cssTransform(values as Matrix);
+};
+
+export type OriginalBeamIdleTransforms = {
+  character: string;
+  faceAnchor: string;
+};
+
+export const beamOriginalIdleTransforms = (
+  seed: number,
+  currentFaceRotation: number,
+  isCircle: boolean,
+): OriginalBeamIdleTransforms => {
+  const preTranslateX = getUnit(seed, 10, 1);
+  const preTranslateY = getUnit(seed, 10, 2);
+  const wrapperTranslateX = preTranslateX < 5 ? preTranslateX + 4 : preTranslateX;
+  const wrapperTranslateY = preTranslateY < 5 ? preTranslateY + 4 : preTranslateY;
+  const wrapperRotation = getUnit(seed, 360);
+  const bodyRotation = isCircle
+    ? 0
+    : ((wrapperRotation + 45) % 90 + 90) % 90 - 45;
+  const originalScale = 1 + getUnit(seed, ORIGINAL_BEAM_SIZE / 12) / 10;
+  const faceRotation = getUnit(seed, 10, 3);
+  const faceTranslateX =
+    wrapperTranslateX > 6 ? wrapperTranslateX / 2 : getUnit(seed, 8, 1);
+  const faceTranslateY =
+    wrapperTranslateY > 6 ? wrapperTranslateY / 2 : getUnit(seed, 7, 2);
+  const unitScale = VIEWBOX_SIZE / ORIGINAL_BEAM_SIZE;
+  const bodyExpansion = VIEWBOX_SIZE / ROOM_BEAM_SIZE;
+
+  const roomBodyToOriginalBody = multiply(
+    translate(-ROOM_BEAM_X * bodyExpansion, -ROOM_BEAM_Y * bodyExpansion),
+    scale(bodyExpansion),
+  );
+  const originalBodyTransform = multiply(
+    multiply(
+      translate(wrapperTranslateX * unitScale, wrapperTranslateY * unitScale),
+      rotate(bodyRotation, VIEWBOX_SIZE / 2, VIEWBOX_SIZE / 2),
+    ),
+    scale(originalScale),
+  );
+  const renderedCharacter = multiply(originalBodyTransform, roomBodyToOriginalBody);
+
+  // CSS applies the character matrix around its transform origin. Conjugating the
+  // rendered matrix keeps the existing centered animation coordinate system intact.
+  const character = multiply(
+    multiply(translate(-CHARACTER_ORIGIN_X, -CHARACTER_ORIGIN_Y), renderedCharacter),
+    translate(CHARACTER_ORIGIN_X, CHARACTER_ORIGIN_Y),
+  );
+  const originalFaceTransform = multiply(
+    translate(faceTranslateX * unitScale, faceTranslateY * unitScale),
+    rotate(faceRotation, VIEWBOX_SIZE / 2, VIEWBOX_SIZE / 2),
+  );
+  const currentFaceTransform = rotate(
+    currentFaceRotation,
+    CHARACTER_ORIGIN_X,
+    CHARACTER_ORIGIN_Y,
+  );
+  const faceAnchor = multiply(
+    multiply(inverse(renderedCharacter), originalFaceTransform),
+    inverse(currentFaceTransform),
+  );
+
+  return {
+    character: cssTransform(character),
+    faceAnchor: cssTransform(faceAnchor),
+  };
+};
 
 export type MouthOpacities = {
   rest: number;

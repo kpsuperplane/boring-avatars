@@ -2,7 +2,7 @@
   "name": "@kpsuperplane/boring-avatars",
   "description": "Deterministic Marble and Beam SVG avatars with expressive, state-driven React animation.",
   "homepage": "https://github.com/kpsuperplane/boring-avatars#readme",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kpsuperplane/boring-avatars.git"

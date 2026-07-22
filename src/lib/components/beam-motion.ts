@@ -15,6 +15,8 @@ import {
   beamCharacterPose,
   beamFacePose,
   beamGazePose,
+  beamOriginalIdleTransforms,
+  beamShortestRotationTransform,
   beamShadowOpacity,
   beamShadowPose,
   type MouthOpacities,
@@ -46,6 +48,8 @@ export {
   beamFacePose,
   beamGazePose,
   beamMouthPose,
+  beamOriginalIdleTransforms,
+  beamShortestRotationTransform,
   beamRestingMouthPaths,
   beamShadowOpacity,
   beamShadowPose,
@@ -57,9 +61,11 @@ type BeamMotion = {
   audioLevel: number | undefined;
   name: string;
   isCircle: boolean;
+  faceRotation: number;
   character: MotionRef;
   shadow: RefObject<SVGEllipseElement | null>;
   body: MotionRef;
+  faceAnchor: MotionRef;
   face: MotionRef;
   gaze: MotionRef;
   eyesOpen: MotionRef;
@@ -78,9 +84,11 @@ export const useBeamMotion = ({
   audioLevel,
   name,
   isCircle,
+  faceRotation,
   character,
   shadow,
   body,
+  faceAnchor,
   face,
   gaze,
   eyesOpen,
@@ -99,6 +107,7 @@ export const useBeamMotion = ({
   const currentShadow = useRef<string | null>(null);
   const currentShadowOpacity = useRef<number | null>(null);
   const currentBody = useRef<string | null>(null);
+  const currentFaceAnchor = useRef<string | null>(null);
   const currentFace = useRef<string | null>(null);
   const currentGaze = useRef<string | null>(null);
   const currentMouth = useRef<MouthOpacities | null>(null);
@@ -154,7 +163,33 @@ export const useBeamMotion = ({
     const random = createSeededRandom(hashCode(`${name}:${activity}:beam`));
     const mouthRandom = createSeededRandom(hashCode(`${name}:${activity}:beam-mouth`));
     const runtime = createMotionRuntime();
-    const characterBase = beamCharacterPose(activity);
+    const enabling = !wasAnimated && animated;
+    const originalIdleTransforms = beamOriginalIdleTransforms(
+      hashCode(name),
+      faceRotation,
+      isCircle,
+    );
+    const identityFaceAnchor = 'translate(0px, 0px) rotate(0deg) scale(1)';
+    const staticIdle = !animated && activity === 'idle';
+    const previousStaticIdle = !wasAnimated && previous === 'idle';
+    const characterBase = staticIdle
+      ? originalIdleTransforms.character
+      : beamCharacterPose(activity);
+    const previousCharacterBase = previousStaticIdle
+      ? originalIdleTransforms.character
+      : beamCharacterPose(previous);
+    const faceAnchorBase = staticIdle
+      ? originalIdleTransforms.faceAnchor
+      : identityFaceAnchor;
+    const previousFaceAnchorBase = previousStaticIdle
+      ? originalIdleTransforms.faceAnchor
+      : identityFaceAnchor;
+    const characterTransitionBase = staticIdle
+      ? characterBase
+      : characterBase.replace(' scale(', ' rotate(0deg) scale(');
+    const previousCharacterTransitionBase = previousStaticIdle
+      ? previousCharacterBase
+      : previousCharacterBase.replace(' scale(', ' rotate(0deg) scale(');
     const shadowBase = beamShadowPose(activity);
     const shadowOpacityBase = beamShadowOpacity(activity);
     const bodyBase = beamBodyPose(activity);
@@ -164,12 +199,14 @@ export const useBeamMotion = ({
     const shadowFromCurrent = currentShadow.current;
     const shadowOpacityFromCurrent = currentShadowOpacity.current;
     const bodyFromCurrent = currentBody.current;
+    const faceAnchorFromCurrent = currentFaceAnchor.current;
     const faceFromCurrent = currentFace.current;
     const gazeFromCurrent = currentGaze.current;
     currentCharacter.current = null;
     currentShadow.current = null;
     currentShadowOpacity.current = null;
     currentBody.current = null;
+    currentFaceAnchor.current = null;
     currentFace.current = null;
     currentGaze.current = null;
     const stateChanged = previous !== activity;
@@ -177,9 +214,10 @@ export const useBeamMotion = ({
       characterFromCurrent !== null ||
       shadowFromCurrent !== null ||
       bodyFromCurrent !== null ||
+      faceAnchorFromCurrent !== null ||
       faceFromCurrent !== null ||
       gazeFromCurrent !== null;
-    const transitionDuration = stateChanged
+    const transitionDuration = stateChanged || enabling
       ? STATE_TRANSITION_MS
       : settling && hasCurrentPose
         ? 320
@@ -192,8 +230,12 @@ export const useBeamMotion = ({
         animate(
           character.current,
           [
-            { transform: characterFromCurrent ?? beamCharacterPose(previous) },
-            { transform: characterBase },
+            {
+              transform: beamShortestRotationTransform(
+                characterFromCurrent ?? previousCharacterTransitionBase,
+              ),
+            },
+            { transform: characterTransitionBase },
           ],
           transitionOptions(transitionDuration),
         ),
@@ -213,6 +255,20 @@ export const useBeamMotion = ({
           [{ transform: bodyFromCurrent ?? beamBodyPose(previous) }, { transform: bodyBase }],
           transitionOptions(transitionDuration),
         ),
+        faceAnchorFromCurrent !== null || faceAnchorBase !== previousFaceAnchorBase
+          ? animate(
+              faceAnchor.current,
+              [
+                {
+                  transform: beamShortestRotationTransform(
+                    faceAnchorFromCurrent ?? previousFaceAnchorBase,
+                  ),
+                },
+                { transform: faceAnchorBase },
+              ],
+              transitionOptions(transitionDuration),
+            )
+          : null,
         animate(
           face.current,
           [{ transform: faceFromCurrent ?? beamFacePose(previous) }, { transform: faceBase }],
@@ -575,6 +631,7 @@ export const useBeamMotion = ({
       currentShadow.current = captureAnimatedStyle(shadow.current, 'transform');
       currentShadowOpacity.current = captureAnimatedOpacity(shadow.current);
       currentBody.current = captureAnimatedStyle(body.current, 'transform');
+      currentFaceAnchor.current = captureAnimatedStyle(faceAnchor.current, 'transform');
       currentFace.current = captureAnimatedStyle(face.current, 'transform');
       currentGaze.current = captureAnimatedStyle(gaze.current, 'transform');
       const rest = captureAnimatedOpacity(mouthRest.current);
@@ -599,7 +656,7 @@ export const useBeamMotion = ({
       activeRestingMorph.current = null;
       wholeBodyAction.current = false;
     };
-  }, [activity, animated, body, character, face, gaze, hasAudio, isCircle, name, reduced, shadow]);
+  }, [activity, animated, body, character, face, faceAnchor, faceRotation, gaze, hasAudio, isCircle, name, reduced, shadow]);
 
   useClientLayoutEffect(() => {
     const previousActivity = previousMouthActivity.current;

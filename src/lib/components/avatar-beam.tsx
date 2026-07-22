@@ -6,6 +6,7 @@ import {
   beamFacePose,
   beamGazePose,
   beamMouthPose,
+  beamOriginalIdleTransforms,
   beamRestingMouthPaths,
   beamShadowOpacity,
   beamShadowPose,
@@ -14,10 +15,20 @@ import {
 import type { AvatarProps } from './types';
 
 const SIZE = 100;
+const EYE_SPACING_SCALE = 1.15;
+const MOUTH_Y_OFFSET = -2.4;
 const DEFAULT_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
 const motionStyle: React.CSSProperties = {
   transformBox: 'fill-box',
   transformOrigin: 'center',
+};
+const characterMotionStyle: React.CSSProperties = {
+  transformBox: 'view-box',
+  transformOrigin: '50px 52px',
+};
+const faceAnchorMotionStyle: React.CSSProperties = {
+  transformBox: 'view-box',
+  transformOrigin: '0 0',
 };
 
 const generateData = (name: string, colors: string[]) => {
@@ -31,7 +42,7 @@ const generateData = (name: string, colors: string[]) => {
     backgroundColor: getRandomColor(seed + 13, colors, colors.length),
     shadowColor: getRandomColor(seed + 29, colors, colors.length),
     isCircle: getBoolean(seed, 1),
-    eyeSpread: 10.5 + Math.abs(getUnit(seed, 1.5, 1)),
+    eyeSpread: (10.5 + Math.abs(getUnit(seed, 1.5, 1))) * EYE_SPACING_SCALE,
     eyeSize: (3.2 + (seed % 3) * 0.3) * 0.8,
     mouthWidth: 7.5 + (seed % 4),
     useHalfMoon: seed % 2 === 0,
@@ -60,6 +71,7 @@ const AvatarBeam = ({
   const character = React.useRef<SVGGElement>(null);
   const shadow = React.useRef<SVGEllipseElement>(null);
   const body = React.useRef<SVGGElement>(null);
+  const faceAnchor = React.useRef<SVGGElement>(null);
   const face = React.useRef<SVGGElement>(null);
   const gaze = React.useRef<SVGGElement>(null);
   const eyesOpen = React.useRef<SVGGElement>(null);
@@ -76,9 +88,11 @@ const AvatarBeam = ({
     audioLevel,
     name,
     isCircle: data.isCircle,
+    faceRotation: data.faceRotation,
     character,
     shadow,
     body,
+    faceAnchor,
     face,
     gaze,
     eyesOpen,
@@ -92,6 +106,18 @@ const AvatarBeam = ({
   });
 
   const mouthPose = beamMouthPose(activity);
+  const originalIdleTransforms = beamOriginalIdleTransforms(
+    data.seed,
+    data.faceRotation,
+    data.isCircle,
+  );
+  const isOriginalStaticIdle = activity === 'idle' && !animated;
+  const characterPose = isOriginalStaticIdle
+    ? originalIdleTransforms.character
+    : beamCharacterPose(activity);
+  const faceAnchorPose = isOriginalStaticIdle
+    ? originalIdleTransforms.faceAnchor
+    : 'translate(0px, 0px) rotate(0deg) scale(1)';
 
   return (
     <svg
@@ -151,7 +177,7 @@ const AvatarBeam = ({
         <g
           ref={character}
           data-motion="beam-character"
-          style={{ ...motionStyle, transform: beamCharacterPose(activity) }}
+          style={{ ...characterMotionStyle, transform: characterPose }}
         >
           <g
             ref={body}
@@ -190,92 +216,106 @@ const AvatarBeam = ({
                 />
               </>
             )}
-            <g transform={`rotate(${data.faceRotation} 50 52)`}>
-              <g
-                ref={face}
-                data-motion="beam-face"
-                style={{ ...motionStyle, transform: beamFacePose(activity) }}
-              >
+            <g
+              ref={faceAnchor}
+              data-motion="beam-face-anchor"
+              style={{ ...faceAnchorMotionStyle, transform: faceAnchorPose }}
+            >
+              <g transform={`rotate(${data.faceRotation} 50 52)`}>
                 <g
-                  ref={eyesOpen}
-                  data-motion="beam-eyes-open"
-                  style={{ opacity: 1 }}
+                  ref={face}
+                  data-motion="beam-face"
+                  style={{ ...motionStyle, transform: beamFacePose(activity) }}
                 >
                   <g
-                    ref={gaze}
-                    data-motion="beam-gaze"
-                    style={{ ...motionStyle, transform: beamGazePose(activity) }}
+                    ref={eyesOpen}
+                    data-motion="beam-eyes-open"
+                    style={{ opacity: 1 }}
                   >
-                    <ellipse
-                      cx={50 - data.eyeSpread}
-                      cy="48"
-                      rx={data.eyeSize}
-                      ry="3.12"
-                      fill={data.faceColor}
+                    <g
+                      ref={gaze}
+                      data-motion="beam-gaze"
+                      style={{ ...motionStyle, transform: beamGazePose(activity) }}
+                    >
+                      <ellipse
+                        cx={50 - data.eyeSpread}
+                        cy="48"
+                        rx={data.eyeSize}
+                        ry="3.12"
+                        fill={data.faceColor}
+                      />
+                      <ellipse
+                        cx={50 + data.eyeSpread}
+                        cy="48"
+                        rx={data.eyeSize}
+                        ry="3.12"
+                        fill={data.faceColor}
+                      />
+                    </g>
+                  </g>
+                  <g
+                    ref={eyesClosed}
+                    data-motion="beam-eyes-closed"
+                    style={{ opacity: 0 }}
+                  >
+                    <path
+                      d={`M${47 - data.eyeSpread} 48 Q${50 - data.eyeSpread} 50 ${53 - data.eyeSpread} 48`}
+                      stroke={data.faceColor}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
                     />
-                    <ellipse
-                      cx={50 + data.eyeSpread}
-                      cy="48"
-                      rx={data.eyeSize}
-                      ry="3.12"
-                      fill={data.faceColor}
+                    <path
+                      d={`M${47 + data.eyeSpread} 48 Q${50 + data.eyeSpread} 50 ${53 + data.eyeSpread} 48`}
+                      stroke={data.faceColor}
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
                     />
                   </g>
-                </g>
-                <g
-                  ref={eyesClosed}
-                  data-motion="beam-eyes-closed"
-                  style={{ opacity: 0 }}
-                >
-                  <path
-                    d={`M${47 - data.eyeSpread} 48 Q${50 - data.eyeSpread} 50 ${53 - data.eyeSpread} 48`}
-                    stroke={data.faceColor}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d={`M${47 + data.eyeSpread} 48 Q${50 + data.eyeSpread} 50 ${53 + data.eyeSpread} 48`}
-                    stroke={data.faceColor}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </g>
-                <g
-                  ref={mouthRest}
-                  data-motion="beam-mouth-rest"
-                  style={{ opacity: mouthPose.rest }}
-                >
-                  <path
-                    ref={mouthMorph}
-                    data-motion="beam-mouth-morph"
-                    d={
-                      activity === 'thinking'
-                        ? mouthPaths.scrunch
-                        : data.useHalfMoon
-                          ? mouthPaths.smile
-                          : mouthPaths.rest
-                    }
-                    fill={data.faceColor}
-                  />
-                </g>
-                <g
-                  ref={mouthSmile}
-                  data-motion="beam-mouth-smile"
-                  style={{ opacity: mouthPose.smile }}
-                />
-                <g
-                  ref={mouthMid}
-                  data-motion="beam-mouth-mid"
-                  style={{ opacity: mouthPose.mid }}
-                >
-                  <ellipse cx="50" cy="64" rx={data.mouthWidth * 0.68} ry="3.2" fill={data.faceColor} />
-                </g>
-                <g
-                  ref={mouthOpen}
-                  data-motion="beam-mouth-open"
-                  style={{ opacity: mouthPose.open }}
-                >
-                  <ellipse cx="50" cy="64" rx={data.mouthWidth * 0.72} ry="6.2" fill={data.faceColor} />
+                  <g
+                    data-motion="beam-mouth-position"
+                    transform={`translate(0 ${MOUTH_Y_OFFSET})`}
+                  >
+                    <g
+                      ref={mouthRest}
+                      data-motion="beam-mouth-rest"
+                      style={{ opacity: mouthPose.rest }}
+                    >
+                      <path
+                        ref={mouthMorph}
+                        data-motion="beam-mouth-morph"
+                        d={
+                          activity === 'thinking'
+                            ? mouthPaths.scrunch
+                            : !animated || data.useHalfMoon
+                              ? mouthPaths.smile
+                              : mouthPaths.rest
+                        }
+                        fill={data.faceColor}
+                        stroke={data.faceColor}
+                        strokeWidth="1.1"
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                    <g
+                      ref={mouthSmile}
+                      data-motion="beam-mouth-smile"
+                      style={{ opacity: mouthPose.smile }}
+                    />
+                    <g
+                      ref={mouthMid}
+                      data-motion="beam-mouth-mid"
+                      style={{ opacity: mouthPose.mid }}
+                    >
+                      <ellipse cx="50" cy="64" rx={data.mouthWidth * 0.68} ry="3.2" fill={data.faceColor} />
+                    </g>
+                    <g
+                      ref={mouthOpen}
+                      data-motion="beam-mouth-open"
+                      style={{ opacity: mouthPose.open }}
+                    >
+                      <ellipse cx="50" cy="64" rx={data.mouthWidth * 0.72} ry="6.2" fill={data.faceColor} />
+                    </g>
+                  </g>
                 </g>
               </g>
             </g>

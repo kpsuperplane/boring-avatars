@@ -4,6 +4,8 @@ A small React library for deterministic, SVG-based avatars with expressive activ
 
 This project is a fork of [boringdesigners/boring-avatars](https://github.com/boringdesigners/boring-avatars). The original design, deterministic identity approach, and MIT license are retained with attribution.
 
+![Overview](assets/overview.gif)
+
 ## Install
 
 ```sh
@@ -30,6 +32,15 @@ const activity: AvatarActivity = 'listening';
 ```
 
 The default export is also available as the named `Avatar` export. `AvatarProps`, `AvatarVariant`, and `AvatarActivity` are exported as public types.
+
+## Motion gallery
+
+These recordings use the name `Clair Obscur`. Speaking uses the playground's deterministic audio-level simulation.
+
+| Variant | Idle | Listening | Thinking | Speaking |
+| --- | --- | --- | --- | --- |
+| **Beam** | ![Beam idle animation](assets/recordings/clair-obscur-beam-idle.gif) | ![Beam listening animation](assets/recordings/clair-obscur-beam-listening.gif) | ![Beam thinking animation](assets/recordings/clair-obscur-beam-thinking.gif) | ![Beam speaking animation](assets/recordings/clair-obscur-beam-speaking.gif) |
+| **Marble** | ![Marble idle animation](assets/recordings/clair-obscur-marble-idle.gif) | ![Marble listening animation](assets/recordings/clair-obscur-marble-listening.gif) | ![Marble thinking animation](assets/recordings/clair-obscur-marble-thinking.gif) | ![Marble speaking animation](assets/recordings/clair-obscur-marble-speaking.gif) |
 
 ## API
 

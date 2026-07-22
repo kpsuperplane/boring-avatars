@@ -5,6 +5,11 @@ import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Avatar from '../src/lib';
+import { getBoolean, getUnit, hashCode } from '../src/lib/utilities';
+import {
+  beamOriginalIdleTransforms,
+  beamShortestRotationTransform,
+} from '../src/lib/components/beam-poses';
 import {
   createMarbleFlowState,
   stateToPaths,
@@ -110,6 +115,79 @@ describe('motion controller', () => {
     ).not.toContain('transform');
   });
 
+  it('matches the original Beam placement for a static idle avatar', async () => {
+    const name = 'Original Static Beam';
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<Avatar name={name} variant="beam" activity="idle" animated={false} />);
+    });
+
+    const seed = hashCode(name);
+    const expected = beamOriginalIdleTransforms(
+      seed,
+      getUnit(seed, 4, 3),
+      getBoolean(seed, 1),
+    );
+    const character = container.querySelector('[data-motion="beam-character"]');
+    const faceAnchor = container.querySelector('[data-motion="beam-face-anchor"]');
+    expect(character?.getAttribute('style')).toContain(expected.character);
+    expect(faceAnchor?.getAttribute('style')).toContain(expected.faceAnchor);
+    expect(character?.contains(faceAnchor)).toBe(true);
+    const characterRotation = Number(expected.character.match(/rotate\(([-\d.]+)deg\)/)?.[1]);
+    const faceRotation = Number(expected.faceAnchor.match(/rotate\(([-\d.]+)deg\)/)?.[1]);
+    expect(Math.abs(characterRotation)).toBeLessThanOrEqual(180);
+    expect(Math.abs(faceRotation)).toBeLessThanOrEqual(180);
+    expect(animateSpy).not.toHaveBeenCalled();
+  });
+
+  it('decomposes captured matrices onto the shortest rotation arc', () => {
+    expect(
+      beamShortestRotationTransform(
+        'matrix(0.984808, -0.173648, 0.347296, 1.969616, 4, -2)',
+      ),
+    ).toBe('translate(4px, -2px) rotate(-10deg) scale(1, 2)');
+  });
+
+  it('minimizes static body rotation using each Beam shape symmetry', () => {
+    const roundedSquare = beamOriginalIdleTransforms(92, getUnit(92, 4, 3), false);
+    const circle = beamOriginalIdleTransforms(82, getUnit(82, 4, 3), true);
+
+    expect(roundedSquare.character).toContain('rotate(2deg)');
+    expect(circle.character).toContain('rotate(0deg)');
+  });
+
+  it('smoothly settles from the original static Beam placement when animation is enabled', async () => {
+    const name = 'Static To Animated Beam';
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<Avatar name={name} variant="beam" activity="idle" animated={false} />);
+    });
+    await act(async () => {
+      root?.render(<Avatar name={name} variant="beam" activity="idle" animated />);
+    });
+
+    const seed = hashCode(name);
+    const expected = beamOriginalIdleTransforms(
+      seed,
+      getUnit(seed, 4, 3),
+      getBoolean(seed, 1),
+    );
+    expect(animateSpy).toHaveBeenCalledWith(
+      [
+        { transform: expected.character },
+        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' },
+      ],
+      expect.objectContaining({ duration: 360, iterations: 1 }),
+    );
+    expect(animateSpy).toHaveBeenCalledWith(
+      [
+        { transform: expected.faceAnchor },
+        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)' },
+      ],
+      expect.objectContaining({ duration: 360, iterations: 1 }),
+    );
+  });
+
   it('does not animate when reduced motion is requested', async () => {
     setReducedMotion(true);
     root = createRoot(container);
@@ -174,8 +252,11 @@ describe('motion controller', () => {
     });
     const eyeSpread =
       (Number(gazeEyes[1].getAttribute('cx')) - Number(gazeEyes[0].getAttribute('cx'))) / 2;
-    expect(eyeSpread).toBeGreaterThanOrEqual(10.5);
-    expect(eyeSpread).toBeLessThanOrEqual(12);
+    expect(eyeSpread).toBeGreaterThanOrEqual(10.5 * 1.15);
+    expect(eyeSpread).toBeLessThanOrEqual(12 * 1.15);
+    expect(
+      container.querySelector('[data-motion="beam-mouth-position"]')?.getAttribute('transform'),
+    ).toBe('translate(0 -2.4)');
     animateSpy.mock.calls.forEach(([keyframes]) => {
       expect(JSON.stringify(keyframes)).not.toContain('scaleY');
     });
@@ -548,10 +629,12 @@ describe('motion controller', () => {
     expect(animateSpy.mock.calls[0][1].duration).toBeGreaterThanOrEqual(5_500);
   });
 
-  it('restores the deterministic half-moon Beam smile', async () => {
+  it('always uses the half-moon Beam smile for a static resting avatar', async () => {
+    const name = 'Static Rest Mouth';
+    expect(hashCode(name) % 2).toBe(1);
     root = createRoot(container);
     await act(async () => {
-      root?.render(<Avatar name="Half Moon" variant="beam" animated={false} />);
+      root?.render(<Avatar name={name} variant="beam" animated={false} />);
     });
 
     expect(container.querySelector('[data-motion="beam-mouth-rest"]')?.getAttribute('style')).toContain(
@@ -560,6 +643,18 @@ describe('motion controller', () => {
     expect(container.querySelector('[data-motion="beam-mouth-morph"]')?.getAttribute('d')).toContain(
       '72',
     );
+  });
+
+  it('gives the resting Beam mouth rounded edge weight without changing its morph path', async () => {
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<Avatar name="Weighted Mouth" variant="beam" animated={false} />);
+    });
+
+    const mouth = container.querySelector('[data-motion="beam-mouth-morph"]');
+    expect(mouth?.getAttribute('stroke-width')).toBe('1.1');
+    expect(mouth?.getAttribute('stroke-linejoin')).toBe('round');
+    expect(mouth?.getAttribute('stroke')).toBe(mouth?.getAttribute('fill'));
   });
 
   it('alternates between both resting Beam smiles outside speaking', async () => {
@@ -580,7 +675,7 @@ describe('motion controller', () => {
     Object.defineProperty(SVGElement.prototype, 'getAnimations', {
       configurable: true,
       value: function getAnimations(this: SVGElement) {
-        return this.getAttribute('data-motion')?.match(/beam-(body|face|gaze)/) ? [{}] : [];
+        return this.getAttribute('data-motion')?.match(/beam-(body|face|gaze)$/) ? [{}] : [];
       },
     });
     vi.spyOn(window, 'getComputedStyle').mockReturnValue({
@@ -601,8 +696,9 @@ describe('motion controller', () => {
     });
 
     const settleCalls = animateSpy.mock.calls.slice(beforeToggle);
-    expect(settleCalls).toHaveLength(5);
+    expect(settleCalls).toHaveLength(6);
     expect(settleCalls.map(([, options]) => options.duration)).toEqual([
+      320,
       320,
       320,
       320,
