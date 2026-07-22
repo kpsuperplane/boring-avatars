@@ -52,6 +52,7 @@ describe('motion controller', () => {
       root = undefined;
     }
     container.remove();
+    Reflect.deleteProperty(SVGElement.prototype, 'getAnimations');
     vi.restoreAllMocks();
   });
 
@@ -69,7 +70,14 @@ describe('motion controller', () => {
     });
 
     idleCancels.forEach((cancel) => expect(cancel).toHaveBeenCalledOnce());
-    expect(animateSpy).toHaveBeenCalledTimes(4);
+    expect(animateSpy).toHaveBeenCalledTimes(7);
+    expect(animateSpy).toHaveBeenCalledWith(
+      [
+        { transform: 'translate(0px, 0px) scale(1)' },
+        { transform: 'translate(2px, -1px) rotate(6deg) scale(1.01)' },
+      ],
+      expect.objectContaining({ duration: 360, iterations: 1 }),
+    );
     const thinkingCancels = cancelSpies.slice(2);
 
     await act(async () => root?.unmount());
@@ -98,7 +106,68 @@ describe('motion controller', () => {
 
     expect(animateSpy).not.toHaveBeenCalled();
     expect(container.querySelector('[data-motion="beam-body"]')?.getAttribute('style')).toContain(
-      'scale(1.025, 0.98)',
+      'scale(1.018, 0.988)',
+    );
+  });
+
+  it('blinks and speaks without transforming facial feature groups', async () => {
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<Avatar name="Attached Face" variant="beam" activity="idle" />);
+    });
+
+    await act(async () => {
+      root?.render(
+        <Avatar name="Attached Face" variant="beam" activity="speaking" audioLevel={0.82} />,
+      );
+    });
+
+    const featureSelectors = [
+      '[data-motion="beam-eyes-open"]',
+      '[data-motion="beam-eyes-closed"]',
+      '[data-motion="beam-mouth-rest"]',
+      '[data-motion="beam-mouth-mid"]',
+      '[data-motion="beam-mouth-open"]',
+    ];
+
+    featureSelectors.forEach((selector) => {
+      expect(container.querySelector(selector)?.getAttribute('style')).not.toContain('transform');
+    });
+    animateSpy.mock.calls.forEach(([keyframes]) => {
+      expect(JSON.stringify(keyframes)).not.toContain('scaleY');
+    });
+  });
+
+  it('continues state transitions from an in-flight browser pose', async () => {
+    Object.defineProperty(SVGElement.prototype, 'getAnimations', {
+      configurable: true,
+      value: vi.fn(() => [{}]),
+    });
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(
+      (element) =>
+        ({
+          opacity: element.getAttribute('data-motion')?.includes('mouth') ? '0.4' : '1',
+          transform:
+            element.getAttribute('data-motion') === 'beam-body'
+              ? 'matrix(1, 0, 0, 1, 0, -0.75)'
+              : 'matrix(1, 0, 0, 1, 0.5, 0)',
+        }) as CSSStyleDeclaration,
+    );
+
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(<Avatar name="Continuous" variant="beam" activity="idle" />);
+    });
+    await act(async () => {
+      root?.render(<Avatar name="Continuous" variant="beam" activity="speaking" />);
+    });
+
+    expect(animateSpy).toHaveBeenCalledWith(
+      [
+        { transform: 'matrix(1, 0, 0, 1, 0, -0.75)' },
+        { transform: 'translate(0px, -1px) scale(1.018, 0.988)' },
+      ],
+      expect.objectContaining({ duration: 360, iterations: 1 }),
     );
   });
 

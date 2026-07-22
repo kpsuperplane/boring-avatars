@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { getRandomColor, getUnit, hashCode } from '../utilities';
-import { marblePose, useMarbleMotion } from './motion';
+import { marblePose, marbleSecondaryPose, useMarbleMotion } from './motion';
 import type { AvatarProps } from './types';
 
 const SIZE = 100;
@@ -100,7 +100,11 @@ const AvatarMarble = ({
             transform={`rotate(${data.secondRotation} 50 50)`}
           />
         </g>
-        <g ref={secondary} data-motion="marble-secondary" style={motionStyle}>
+        <g
+          ref={secondary}
+          data-motion="marble-secondary"
+          style={{ ...motionStyle, transform: marbleSecondaryPose(activity) }}
+        >
           <ellipse
             cx={27 + data.offsetX}
             cy={67 + data.offsetY}

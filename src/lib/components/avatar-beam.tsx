@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { getContrast, getRandomColor, getUnit, hashCode } from '../utilities';
-import { beamBodyPose, beamFacePose, useBeamMotion } from './motion';
+import { beamBodyPose, beamFacePose, beamMouthPose, useBeamMotion } from './motion';
 import type { AvatarProps } from './types';
 
 const SIZE = 100;
@@ -22,7 +22,7 @@ const generateData = (name: string, colors: string[]) => {
     eyeSpread: 10 + Math.abs(getUnit(seed, 4, 1)),
     eyeSize: 3.2 + (seed % 3) * 0.3,
     mouthWidth: 7.5 + (seed % 4),
-    bodyOffset: getUnit(seed, 2.2, 2),
+    bodyOffset: getUnit(seed, 1.1, 2),
     faceRotation: getUnit(seed, 4, 3),
   };
 };
@@ -43,12 +43,27 @@ const AvatarBeam = ({
   const maskId = React.useId();
   const body = React.useRef<SVGGElement>(null);
   const face = React.useRef<SVGGElement>(null);
-  const eyes = React.useRef<SVGGElement>(null);
-  const mouth = React.useRef<SVGGElement>(null);
+  const eyesOpen = React.useRef<SVGGElement>(null);
+  const eyesClosed = React.useRef<SVGGElement>(null);
+  const mouthRest = React.useRef<SVGGElement>(null);
+  const mouthMid = React.useRef<SVGGElement>(null);
+  const mouthOpen = React.useRef<SVGGElement>(null);
 
-  useBeamMotion({ activity, animated, audioLevel, name, body, face, eyes, mouth });
+  useBeamMotion({
+    activity,
+    animated,
+    audioLevel,
+    name,
+    body,
+    face,
+    eyesOpen,
+    eyesClosed,
+    mouthRest,
+    mouthMid,
+    mouthOpen,
+  });
 
-  const mouthY = activity === 'thinking' ? 62 : 64;
+  const mouthPose = beamMouthPose(activity);
 
   return (
     <svg
@@ -70,28 +85,32 @@ const AvatarBeam = ({
           <rect width={SIZE} height={SIZE} rx={square ? 0 : SIZE / 2} fill="white" />
         </mask>
         <radialGradient id={`${maskId}-background`} cx="34%" cy="24%" r="90%">
-          <stop stopColor={data.backgroundColor} stopOpacity="0.82" />
-          <stop offset="1" stopColor={data.shadowColor} />
+          <stop stopColor={data.backgroundColor} stopOpacity="0.65" />
+          <stop offset="1" stopColor={data.shadowColor} stopOpacity="0.42" />
         </radialGradient>
-        <radialGradient id={`${maskId}-sphere`} cx="32%" cy="24%" r="76%">
-          <stop offset="0" stopColor="white" stopOpacity="0.72" />
-          <stop offset="0.16" stopColor={data.bodyColor} />
-          <stop offset="0.72" stopColor={data.bodyColor} />
-          <stop offset="1" stopColor={data.faceColor} stopOpacity="0.28" />
+        <radialGradient id={`${maskId}-sphere`} cx="31%" cy="23%" r="78%">
+          <stop offset="0" stopColor="white" />
+          <stop offset="0.14" stopColor={data.bodyColor} />
+          <stop offset="0.7" stopColor={data.bodyColor} />
+          <stop offset="1" stopColor={data.shadowColor} />
         </radialGradient>
         <linearGradient id={`${maskId}-rim`} x1="0" y1="0" x2="1" y2="1">
           <stop stopColor="white" stopOpacity="0.5" />
           <stop offset="0.5" stopColor="white" stopOpacity="0" />
           <stop offset="1" stopColor="black" stopOpacity="0.2" />
         </linearGradient>
-        <filter id={`${maskId}-shadow`} x="-30%" y="-30%" width="160%" height="170%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000" floodOpacity="0.28" />
+        <filter id={`${maskId}-shadow`} x="-20%" y="-20%" width="140%" height="145%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#000" floodOpacity="0.24" />
         </filter>
       </defs>
 
       <g mask={`url(#${maskId})`}>
-        <rect width={SIZE} height={SIZE} fill={`url(#${maskId}-background)`} />
-        <ellipse cx="50" cy="84" rx="27" ry="6" fill="#000" opacity="0.18" />
+        <rect
+          width={SIZE}
+          height={SIZE}
+          fill={`url(#${maskId}-background)`}
+          opacity={square ? 0.48 : 0}
+        />
         <g transform={`translate(${data.bodyOffset} 0)`}>
           <g
             ref={body}
@@ -100,19 +119,19 @@ const AvatarBeam = ({
           >
             <circle
               cx="50"
-              cy="49"
-              r="34"
+              cy="50"
+              r="42"
               fill={`url(#${maskId}-sphere)`}
               filter={`url(#${maskId}-shadow)`}
             />
             <circle
               cx="50"
-              cy="49"
-              r="33.5"
+              cy="50"
+              r="41.4"
               stroke={`url(#${maskId}-rim)`}
               strokeWidth="1.5"
             />
-            <ellipse cx="39" cy="31" rx="10" ry="6" fill="white" opacity="0.19" />
+            <ellipse cx="37" cy="27" rx="11" ry="6.5" fill="white" opacity="0.2" />
             <g transform={`rotate(${data.faceRotation} 50 52)`}>
               <g
                 ref={face}
@@ -120,54 +139,75 @@ const AvatarBeam = ({
                 style={{ ...motionStyle, transform: beamFacePose(activity) }}
               >
                 <g
-                  ref={eyes}
-                  data-motion="beam-eyes"
-                  style={{ ...motionStyle, transformOrigin: 'center 49px' }}
+                  ref={eyesOpen}
+                  data-motion="beam-eyes-open"
+                  style={{ opacity: 1 }}
                 >
                   <ellipse
                     cx={50 - data.eyeSpread}
-                    cy="49"
+                    cy="48"
                     rx={data.eyeSize}
-                    ry={activity === 'listening' ? 4.2 : 3.7}
+                    ry="3.9"
                     fill={data.faceColor}
                   />
                   <ellipse
                     cx={50 + data.eyeSpread}
-                    cy="49"
+                    cy="48"
                     rx={data.eyeSize}
-                    ry={activity === 'listening' ? 4.2 : 3.7}
+                    ry="3.9"
                     fill={data.faceColor}
                   />
-                  <circle cx={49 - data.eyeSpread} cy="47.8" r="0.8" fill="white" opacity="0.78" />
-                  <circle cx={49 + data.eyeSpread} cy="47.8" r="0.8" fill="white" opacity="0.78" />
+                  <circle cx={49 - data.eyeSpread} cy="46.8" r="0.8" fill="white" opacity="0.78" />
+                  <circle cx={49 + data.eyeSpread} cy="46.8" r="0.8" fill="white" opacity="0.78" />
                 </g>
                 <g
-                  ref={mouth}
-                  data-motion="beam-mouth"
-                  style={{ ...motionStyle, transformOrigin: `center ${mouthY}px` }}
+                  ref={eyesClosed}
+                  data-motion="beam-eyes-closed"
+                  style={{ opacity: 0 }}
                 >
-                  {activity === 'speaking' ? (
-                    <ellipse
-                      cx="50"
-                      cy={mouthY}
-                      rx={data.mouthWidth * 0.72}
-                      ry="3.4"
-                      fill={data.faceColor}
-                    />
-                  ) : (
-                    <path
-                      d={`M${50 - data.mouthWidth} ${mouthY} Q50 ${mouthY + (activity === 'listening' ? 2 : 3.4)} ${50 + data.mouthWidth} ${mouthY}`}
-                      stroke={data.faceColor}
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                    />
-                  )}
+                  <path
+                    d={`M${47 - data.eyeSpread} 48 Q${50 - data.eyeSpread} 50 ${53 - data.eyeSpread} 48`}
+                    stroke={data.faceColor}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d={`M${47 + data.eyeSpread} 48 Q${50 + data.eyeSpread} 50 ${53 + data.eyeSpread} 48`}
+                    stroke={data.faceColor}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                </g>
+                <g
+                  ref={mouthRest}
+                  data-motion="beam-mouth-rest"
+                  style={{ opacity: mouthPose.rest }}
+                >
+                  <path
+                    d={`M${50 - data.mouthWidth} 63 Q50 67 ${50 + data.mouthWidth} 63`}
+                    stroke={data.faceColor}
+                    strokeWidth="2.8"
+                    strokeLinecap="round"
+                  />
+                </g>
+                <g
+                  ref={mouthMid}
+                  data-motion="beam-mouth-mid"
+                  style={{ opacity: mouthPose.mid }}
+                >
+                  <ellipse cx="50" cy="64" rx={data.mouthWidth * 0.68} ry="3.2" fill={data.faceColor} />
+                </g>
+                <g
+                  ref={mouthOpen}
+                  data-motion="beam-mouth-open"
+                  style={{ opacity: mouthPose.open }}
+                >
+                  <ellipse cx="50" cy="64" rx={data.mouthWidth * 0.72} ry="6.2" fill={data.faceColor} />
                 </g>
               </g>
             </g>
           </g>
         </g>
-        <rect width={SIZE} height={SIZE} fill="white" opacity="0.025" />
       </g>
     </svg>
   );
