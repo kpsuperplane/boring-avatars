@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Avatar, { type AvatarActivity, type AvatarVariant } from '../lib';
 
 const SIZES = [24, 40, 96, 160] as const;
@@ -31,11 +31,31 @@ const Segment = <T extends string>({
 );
 
 export const Playground = () => {
-  const [name, setName] = useState('Clara Barton');
+  const benchmark = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedInstances = Number.parseInt(params.get('instances') ?? '', 10);
+    const instances = Number.isFinite(requestedInstances)
+      ? Math.min(100, Math.max(1, requestedInstances))
+      : null;
+    const requestedActivity = params.get('activity');
+    return {
+      instances,
+      name: params.get('name') ?? 'Clara Barton',
+      activity: ACTIVITIES.includes(requestedActivity as AvatarActivity)
+        ? (requestedActivity as AvatarActivity)
+        : 'idle',
+      animated: params.get('animated') !== 'false',
+      variant: params.get('variant') === 'beam' ? 'beam' : 'marble',
+    } as const;
+  }, []);
+  const previewSizes = benchmark.instances
+    ? Array.from({ length: benchmark.instances }, () => 96)
+    : SIZES;
+  const [name, setName] = useState(benchmark.name);
   const [colors, setColors] = useState(DEFAULT_PALETTE);
-  const [variant, setVariant] = useState<AvatarVariant>('marble');
-  const [activity, setActivity] = useState<AvatarActivity>('idle');
-  const [animated, setAnimated] = useState(true);
+  const [variant, setVariant] = useState<AvatarVariant>(benchmark.variant);
+  const [activity, setActivity] = useState<AvatarActivity>(benchmark.activity);
+  const [animated, setAnimated] = useState(benchmark.animated);
   const [square, setSquare] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0.48);
   const [simulating, setSimulating] = useState(false);
@@ -144,8 +164,8 @@ export const Playground = () => {
         </aside>
 
         <section className="previews" aria-label="Avatar previews">
-          {SIZES.map((size) => (
-            <article className="preview" key={size}>
+          {previewSizes.map((size, index) => (
+            <article className="preview" key={`${size}-${index}`}>
               <div className="avatar-stage">
                 <Avatar
                   name={name}

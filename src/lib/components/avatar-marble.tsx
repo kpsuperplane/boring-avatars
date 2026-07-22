@@ -1,15 +1,15 @@
 import * as React from 'react';
-import { getRandomColor, getUnit, hashCode } from '../utilities';
-import { marblePose, marbleSecondaryPose, useMarbleMotion } from './motion';
+import { getRandomColor, hashCode } from '../utilities';
+import {
+  createMarbleFlowState,
+  createMarblePressurePath,
+  stateToPaths,
+} from './marble-flow-field';
+import { marbleRippleOpacity, useMarbleMotion } from './motion';
 import type { AvatarProps } from './types';
 
 const SIZE = 100;
 const DEFAULT_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
-const motionStyle: React.CSSProperties = {
-  transformBox: 'fill-box',
-  transformOrigin: 'center',
-};
-
 const generateData = (name: string, colors: string[]) => {
   const seed = hashCode(name);
   return {
@@ -18,11 +18,17 @@ const generateData = (name: string, colors: string[]) => {
     middle: getRandomColor(seed + 7, colors, colors.length),
     foreground: getRandomColor(seed + 19, colors, colors.length),
     accent: getRandomColor(seed + 31, colors, colors.length),
-    firstRotation: getUnit(seed, 32, 1),
-    secondRotation: getUnit(seed + 17, 38, 2),
-    offsetX: getUnit(seed, 5, 1),
-    offsetY: getUnit(seed, 5, 2),
   };
+};
+
+const luminance = (color: string) => {
+  const hex = color.startsWith('#') ? color.slice(1) : color;
+  const expanded = hex.length === 3 ? hex.split('').map((value) => value + value).join('') : hex;
+  const channels = [0, 2, 4].map((offset) => Number.parseInt(expanded.slice(offset, offset + 2), 16) / 255);
+  const [red, green, blue] = channels.map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4),
+  );
+  return red * 0.2126 + green * 0.7152 + blue * 0.0722;
 };
 
 const AvatarMarble = ({
@@ -39,11 +45,35 @@ const AvatarMarble = ({
   const palette = colors.length ? colors : DEFAULT_COLORS;
   const data = generateData(name, palette);
   const maskId = React.useId();
-  const flow = React.useRef<SVGGElement>(null);
-  const secondary = React.useRef<SVGGElement>(null);
-  const ripple = React.useRef<SVGGElement>(null);
+  const dyeA = React.useRef<SVGPathElement>(null);
+  const dyeB = React.useRef<SVGPathElement>(null);
+  const dyeC = React.useRef<SVGPathElement>(null);
+  const pressure = React.useRef<SVGPathElement>(null);
+  const staticPaths = React.useMemo(
+    () => stateToPaths(createMarbleFlowState(data.seed, activity)),
+    [activity, data.seed],
+  );
+  const pressurePath = React.useMemo(
+    () => createMarblePressurePath(data.seed, activity, 0),
+    [activity, data.seed],
+  );
+  const medianLuminance = [...palette]
+    .map(luminance)
+    .sort((first, second) => first - second)[Math.floor(palette.length / 2)];
+  const blendMode: React.CSSProperties['mixBlendMode'] =
+    medianLuminance < 0.45 ? 'screen' : 'multiply';
 
-  useMarbleMotion({ activity, animated, audioLevel, name, flow, secondary, ripple });
+  useMarbleMotion({
+    activity,
+    animated,
+    audioLevel,
+    name,
+    seed: data.seed,
+    dyeA,
+    dyeB,
+    dyeC,
+    pressure,
+  });
 
   return (
     <svg
@@ -64,76 +94,81 @@ const AvatarMarble = ({
         <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={SIZE} height={SIZE}>
           <rect width={SIZE} height={SIZE} rx={square ? 0 : SIZE / 2} fill="white" />
         </mask>
-        <radialGradient id={`${maskId}-base`} cx="28%" cy="20%" r="92%">
+        <radialGradient
+          id={`${maskId}-base`}
+          gradientUnits="userSpaceOnUse"
+          cx="28"
+          cy="20"
+          r="92"
+        >
           <stop offset="0" stopColor={data.accent} />
           <stop offset="0.54" stopColor={data.background} />
           <stop offset="1" stopColor={data.middle} />
         </radialGradient>
-        <filter id={`${maskId}-soft`} x="-22%" y="-22%" width="144%" height="144%">
-          <feGaussianBlur stdDeviation="5.4" />
+        <filter id={`${maskId}-fluid-soft`} x="-16%" y="-16%" width="132%" height="132%">
+          <feGaussianBlur stdDeviation="2.4" />
         </filter>
+        <radialGradient id={`${maskId}-dye-a`} cx="34%" cy="36%" r="72%">
+          <stop stopColor={data.accent} stopOpacity="0.94" />
+          <stop offset="0.62" stopColor={data.middle} stopOpacity="0.82" />
+          <stop offset="1" stopColor={data.middle} stopOpacity="0.52" />
+        </radialGradient>
+        <linearGradient id={`${maskId}-dye-b`} x1="0" y1="1" x2="1" y2="0">
+          <stop stopColor={data.foreground} stopOpacity="0.9" />
+          <stop offset="0.56" stopColor={data.background} stopOpacity="0.76" />
+          <stop offset="1" stopColor={data.accent} stopOpacity="0.48" />
+        </linearGradient>
+        <radialGradient id={`${maskId}-dye-c`} cx="68%" cy="28%" r="68%">
+          <stop stopColor={data.background} stopOpacity="0.88" />
+          <stop offset="0.58" stopColor={data.accent} stopOpacity="0.68" />
+          <stop offset="1" stopColor={data.foreground} stopOpacity="0.34" />
+        </radialGradient>
         <linearGradient id={`${maskId}-sheen`} x1="0" y1="0" x2="1" y2="1">
           <stop stopColor="white" stopOpacity="0.32" />
           <stop offset="0.45" stopColor="white" stopOpacity="0.04" />
           <stop offset="1" stopColor="black" stopOpacity="0.12" />
         </linearGradient>
+        <radialGradient id={`${maskId}-bloom`} cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor={data.accent} stopOpacity="0.62" />
+          <stop offset="0.48" stopColor={data.foreground} stopOpacity="0.34" />
+          <stop offset="1" stopColor={data.foreground} stopOpacity="0" />
+        </radialGradient>
       </defs>
 
       <g mask={`url(#${maskId})`}>
-        <rect width={SIZE} height={SIZE} fill={`url(#${maskId}-base)`} />
-        <g
-          ref={flow}
-          data-motion="marble-flow"
-          style={{ ...motionStyle, transform: marblePose(activity) }}
-        >
+        <rect x="-20" y="-20" width="140" height="140" fill={`url(#${maskId}-base)`} />
+        <g filter={`url(#${maskId}-fluid-soft)`}>
           <path
-            d="M-12 37C2 5 31 4 48 19c19 17 30 6 52-8l18 54c-21 13-42 17-57 7-24-16-41 10-65 16z"
-            fill={data.middle}
-            transform={`translate(${data.offsetX} ${data.offsetY}) rotate(${data.firstRotation} 50 50)`}
-            filter={`url(#${maskId}-soft)`}
+            ref={dyeA}
+            data-motion="marble-field"
+            d={staticPaths[0]}
+            fill={`url(#${maskId}-dye-a)`}
+            opacity="0.82"
           />
           <path
-            d="M7 105C-2 75 12 54 35 53c28-1 26-30 61-35l14 69c-22 18-37 3-55 11-18 9-31 17-48 7z"
-            fill={data.foreground}
-            opacity="0.88"
-            filter={`url(#${maskId}-soft)`}
-            transform={`rotate(${data.secondRotation} 50 50)`}
+            ref={dyeB}
+            data-motion="marble-flow"
+            d={staticPaths[1]}
+            fill={`url(#${maskId}-dye-b)`}
+            opacity="0.76"
+          />
+          <path
+            ref={dyeC}
+            data-motion="marble-secondary"
+            d={staticPaths[2]}
+            fill={`url(#${maskId}-dye-c)`}
+            opacity="0.52"
+            style={{ mixBlendMode: blendMode }}
+          />
+          <path
+            ref={pressure}
+            data-motion="marble-bloom"
+            d={pressurePath}
+            fill={`url(#${maskId}-bloom)`}
+            opacity={marbleRippleOpacity(activity)}
+            style={{ mixBlendMode: 'screen' }}
           />
         </g>
-        <g
-          ref={secondary}
-          data-motion="marble-secondary"
-          style={{ ...motionStyle, transform: marbleSecondaryPose(activity) }}
-        >
-          <ellipse
-            cx={27 + data.offsetX}
-            cy={67 + data.offsetY}
-            rx="25"
-            ry="19"
-            fill={data.accent}
-            opacity="0.66"
-            filter={`url(#${maskId}-soft)`}
-          />
-          <ellipse
-            cx={74 - data.offsetX}
-            cy={28 - data.offsetY}
-            rx="20"
-            ry="25"
-            fill={data.background}
-            opacity="0.64"
-            filter={`url(#${maskId}-soft)`}
-          />
-        </g>
-        <g
-          ref={ripple}
-          data-motion="marble-ripple"
-          opacity={activity === 'speaking' ? 0.32 : activity === 'idle' ? 0.12 : 0}
-          style={motionStyle}
-        >
-          <circle cx="50" cy="50" r="31" stroke="white" strokeWidth="2" opacity="0.42" />
-          <circle cx="50" cy="50" r="38" stroke={data.accent} strokeWidth="1.5" opacity="0.34" />
-        </g>
-        <circle cx="34" cy="25" r="27" fill={`url(#${maskId}-sheen)`} opacity="0.72" />
         <rect width={SIZE} height={SIZE} fill={`url(#${maskId}-sheen)`} opacity="0.4" />
       </g>
     </svg>

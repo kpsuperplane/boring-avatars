@@ -42,7 +42,7 @@ The default export is also available as the named `Avatar` export. `AvatarProps`
 | `audioLevel` | `number` | deterministic fallback pulse | Drives listening and speaking response; finite values are clamped to `0…1`, and non-finite values become `0`. |
 | `animated` | `boolean` | `true` | Enables motion when the operating system does not request reduced motion. |
 | `size` | `number \| string` | `"40px"` | Sets SVG width and height. |
-| `square` | `boolean` | `false` | Uses a square outer mask. Beam remains spherical inside it. |
+| `square` | `boolean` | `false` | Uses a square outer viewport. Beam's inner body shape is chosen independently from its seed. |
 | `title` | `boolean` | `false` | Adds an SVG `<title>` containing the name. |
 
 Standard SVG props are passed through to the root element.
@@ -62,9 +62,15 @@ import { Avatar } from '@kpsuperplane/boring-avatars';
 
 ## Motion and accessibility
 
-Animation starts in the browser after hydration, uses the Web Animations API, and is cancelled when state changes or the component unmounts. `animated={false}` and `prefers-reduced-motion: reduce` leave each activity in a stable representative pose. The library does not request microphone access; applications can provide their own normalized audio level when appropriate.
+Animation starts in the browser after hydration and uses finite, seeded events instead of continuously repeating character loops. Beam coordinates short blinks, attentive gestures, and hysteresis-based mouth shapes; Marble advects area-preserving dye contours through a shared seeded vortex field, with a separate pressure contour for speech. State changes settle before activity-specific motion begins.
+
+Animations are cancelled when state changes or the component unmounts. `animated={false}` and `prefers-reduced-motion: reduce` leave each activity in a stable representative pose. The library does not request microphone access; applications can provide their own normalized audio level when appropriate.
 
 The same name and palette always produce the same base SVG and seeded animation cadence.
+
+For repeatable profiling, the playground accepts `instances`, `variant`, `activity`, `animated`,
+and `name` query parameters. For example, `?instances=24&variant=beam&activity=idle` renders
+twenty-four identical 96px Beam avatars.
 
 ## License
 
