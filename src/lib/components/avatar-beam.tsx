@@ -1,130 +1,173 @@
 import * as React from 'react';
-import { hashCode, getUnit, getBoolean, getRandomColor, getContrast } from '../utilities';
+import { getContrast, getRandomColor, getUnit, hashCode } from '../utilities';
+import { beamBodyPose, beamFacePose, useBeamMotion } from './motion';
 import type { AvatarProps } from './types';
 
-const SIZE = 36;
+const SIZE = 100;
+const DEFAULT_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
+const motionStyle: React.CSSProperties = {
+  transformBox: 'fill-box',
+  transformOrigin: 'center',
+};
 
-function generateData(name: string, colors: string[]) {
-  const numFromName = hashCode(name);
-  const range = colors && colors.length;
-  const wrapperColor = getRandomColor(numFromName, colors, range);
-  const preTranslateX = getUnit(numFromName, 10, 1);
-  const wrapperTranslateX = preTranslateX < 5 ? preTranslateX + SIZE / 9 : preTranslateX;
-  const preTranslateY = getUnit(numFromName, 10, 2);
-  const wrapperTranslateY = preTranslateY < 5 ? preTranslateY + SIZE / 9 : preTranslateY;
-
-  const data = {
-    wrapperColor: wrapperColor,
-    faceColor: getContrast(wrapperColor),
-    backgroundColor: getRandomColor(numFromName + 13, colors, range),
-    wrapperTranslateX: wrapperTranslateX,
-    wrapperTranslateY: wrapperTranslateY,
-    wrapperRotate: getUnit(numFromName, 360),
-    wrapperScale: 1 + getUnit(numFromName, SIZE / 12) / 10,
-    isMouthOpen: getBoolean(numFromName, 2),
-    isCircle: getBoolean(numFromName, 1),
-    eyeSpread: getUnit(numFromName, 5),
-    mouthSpread: getUnit(numFromName, 3),
-    faceRotate: getUnit(numFromName, 10, 3),
-    faceTranslateX:
-      wrapperTranslateX > SIZE / 6 ? wrapperTranslateX / 2 : getUnit(numFromName, 8, 1),
-    faceTranslateY:
-      wrapperTranslateY > SIZE / 6 ? wrapperTranslateY / 2 : getUnit(numFromName, 7, 2),
+const generateData = (name: string, colors: string[]) => {
+  const seed = hashCode(name);
+  const bodyColor = getRandomColor(seed, colors, colors.length);
+  return {
+    seed,
+    bodyColor,
+    faceColor: getContrast(bodyColor),
+    backgroundColor: getRandomColor(seed + 13, colors, colors.length),
+    shadowColor: getRandomColor(seed + 29, colors, colors.length),
+    eyeSpread: 10 + Math.abs(getUnit(seed, 4, 1)),
+    eyeSize: 3.2 + (seed % 3) * 0.3,
+    mouthWidth: 7.5 + (seed % 4),
+    bodyOffset: getUnit(seed, 2.2, 2),
+    faceRotation: getUnit(seed, 4, 3),
   };
+};
 
-  return data;
-}
+const AvatarBeam = ({
+  name = 'Clara Barton',
+  colors = DEFAULT_COLORS,
+  activity = 'idle',
+  audioLevel,
+  animated = true,
+  title = false,
+  square = false,
+  size = '40px',
+  ...otherProps
+}: AvatarProps) => {
+  const palette = colors.length ? colors : DEFAULT_COLORS;
+  const data = generateData(name, palette);
+  const maskId = React.useId();
+  const body = React.useRef<SVGGElement>(null);
+  const face = React.useRef<SVGGElement>(null);
+  const eyes = React.useRef<SVGGElement>(null);
+  const mouth = React.useRef<SVGGElement>(null);
 
-const AvatarBeam = ({ name, colors, title, square, size, ...otherProps }: AvatarProps) => {
-  const data = generateData(name, colors);
-  const maskID = React.useId();
+  useBeamMotion({ activity, animated, audioLevel, name, body, face, eyes, mouth });
+
+  const mouthY = activity === 'thinking' ? 62 : 64;
 
   return (
     <svg
-      viewBox={'0 0 ' + SIZE + ' ' + SIZE}
+      viewBox={`0 0 ${SIZE} ${SIZE}`}
       fill="none"
       role="img"
       xmlns="http://www.w3.org/2000/svg"
       width={size}
       height={size}
+      data-avatar-variant="beam"
+      data-avatar-activity={activity}
+      data-audio-level={audioLevel ?? 'fallback'}
+      data-animated={animated}
       {...otherProps}
     >
       {title && <title>{name}</title>}
-      <mask id={maskID} maskUnits="userSpaceOnUse" x={0} y={0} width={SIZE} height={SIZE}>
-        <rect width={SIZE} height={SIZE} rx={square ? undefined : SIZE * 2} fill="#FFFFFF" />
-      </mask>
-      <g mask={`url(#${maskID})`}>
-        <rect width={SIZE} height={SIZE} fill={data.backgroundColor} />
-        <rect
-          x="0"
-          y="0"
-          width={SIZE}
-          height={SIZE}
-          transform={
-            'translate(' +
-            data.wrapperTranslateX +
-            ' ' +
-            data.wrapperTranslateY +
-            ') rotate(' +
-            data.wrapperRotate +
-            ' ' +
-            SIZE / 2 +
-            ' ' +
-            SIZE / 2 +
-            ') scale(' +
-            data.wrapperScale +
-            ')'
-          }
-          fill={data.wrapperColor}
-          rx={data.isCircle ? SIZE : SIZE / 6}
-        />
-        <g
-          transform={
-            'translate(' +
-            data.faceTranslateX +
-            ' ' +
-            data.faceTranslateY +
-            ') rotate(' +
-            data.faceRotate +
-            ' ' +
-            SIZE / 2 +
-            ' ' +
-            SIZE / 2 +
-            ')'
-          }
-        >
-          {data.isMouthOpen ? (
-            <path
-              d={'M15 ' + (19 + data.mouthSpread) + 'c2 1 4 1 6 0'}
-              stroke={data.faceColor}
-              fill="none"
-              strokeLinecap="round"
+      <defs>
+        <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={SIZE} height={SIZE}>
+          <rect width={SIZE} height={SIZE} rx={square ? 0 : SIZE / 2} fill="white" />
+        </mask>
+        <radialGradient id={`${maskId}-background`} cx="34%" cy="24%" r="90%">
+          <stop stopColor={data.backgroundColor} stopOpacity="0.82" />
+          <stop offset="1" stopColor={data.shadowColor} />
+        </radialGradient>
+        <radialGradient id={`${maskId}-sphere`} cx="32%" cy="24%" r="76%">
+          <stop offset="0" stopColor="white" stopOpacity="0.72" />
+          <stop offset="0.16" stopColor={data.bodyColor} />
+          <stop offset="0.72" stopColor={data.bodyColor} />
+          <stop offset="1" stopColor={data.faceColor} stopOpacity="0.28" />
+        </radialGradient>
+        <linearGradient id={`${maskId}-rim`} x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="white" stopOpacity="0.5" />
+          <stop offset="0.5" stopColor="white" stopOpacity="0" />
+          <stop offset="1" stopColor="black" stopOpacity="0.2" />
+        </linearGradient>
+        <filter id={`${maskId}-shadow`} x="-30%" y="-30%" width="160%" height="170%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000" floodOpacity="0.28" />
+        </filter>
+      </defs>
+
+      <g mask={`url(#${maskId})`}>
+        <rect width={SIZE} height={SIZE} fill={`url(#${maskId}-background)`} />
+        <ellipse cx="50" cy="84" rx="27" ry="6" fill="#000" opacity="0.18" />
+        <g transform={`translate(${data.bodyOffset} 0)`}>
+          <g
+            ref={body}
+            data-motion="beam-body"
+            style={{ ...motionStyle, transform: beamBodyPose(activity) }}
+          >
+            <circle
+              cx="50"
+              cy="49"
+              r="34"
+              fill={`url(#${maskId}-sphere)`}
+              filter={`url(#${maskId}-shadow)`}
             />
-          ) : (
-            <path
-              d={'M13,' + (19 + data.mouthSpread) + ' a1,0.75 0 0,0 10,0'}
-              fill={data.faceColor}
+            <circle
+              cx="50"
+              cy="49"
+              r="33.5"
+              stroke={`url(#${maskId}-rim)`}
+              strokeWidth="1.5"
             />
-          )}
-          <rect
-            x={14 - data.eyeSpread}
-            y={14}
-            width={1.5}
-            height={2}
-            rx={1}
-            stroke="none"
-            fill={data.faceColor}
-          />
-          <rect
-            x={20 + data.eyeSpread}
-            y={14}
-            width={1.5}
-            height={2}
-            rx={1}
-            stroke="none"
-            fill={data.faceColor}
-          />
+            <ellipse cx="39" cy="31" rx="10" ry="6" fill="white" opacity="0.19" />
+            <g transform={`rotate(${data.faceRotation} 50 52)`}>
+              <g
+                ref={face}
+                data-motion="beam-face"
+                style={{ ...motionStyle, transform: beamFacePose(activity) }}
+              >
+                <g
+                  ref={eyes}
+                  data-motion="beam-eyes"
+                  style={{ ...motionStyle, transformOrigin: 'center 49px' }}
+                >
+                  <ellipse
+                    cx={50 - data.eyeSpread}
+                    cy="49"
+                    rx={data.eyeSize}
+                    ry={activity === 'listening' ? 4.2 : 3.7}
+                    fill={data.faceColor}
+                  />
+                  <ellipse
+                    cx={50 + data.eyeSpread}
+                    cy="49"
+                    rx={data.eyeSize}
+                    ry={activity === 'listening' ? 4.2 : 3.7}
+                    fill={data.faceColor}
+                  />
+                  <circle cx={49 - data.eyeSpread} cy="47.8" r="0.8" fill="white" opacity="0.78" />
+                  <circle cx={49 + data.eyeSpread} cy="47.8" r="0.8" fill="white" opacity="0.78" />
+                </g>
+                <g
+                  ref={mouth}
+                  data-motion="beam-mouth"
+                  style={{ ...motionStyle, transformOrigin: `center ${mouthY}px` }}
+                >
+                  {activity === 'speaking' ? (
+                    <ellipse
+                      cx="50"
+                      cy={mouthY}
+                      rx={data.mouthWidth * 0.72}
+                      ry="3.4"
+                      fill={data.faceColor}
+                    />
+                  ) : (
+                    <path
+                      d={`M${50 - data.mouthWidth} ${mouthY} Q50 ${mouthY + (activity === 'listening' ? 2 : 3.4)} ${50 + data.mouthWidth} ${mouthY}`}
+                      stroke={data.faceColor}
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                    />
+                  )}
+                </g>
+              </g>
+            </g>
+          </g>
         </g>
+        <rect width={SIZE} height={SIZE} fill="white" opacity="0.025" />
       </g>
     </svg>
   );

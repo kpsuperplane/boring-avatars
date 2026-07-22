@@ -1,37 +1,36 @@
-import AvatarBauhaus from './components/avatar-bauhaus';
-import AvatarRing from './components/avatar-ring';
-import AvatarPixel from './components/avatar-pixel';
 import AvatarBeam from './components/avatar-beam';
-import AvatarSunset from './components/avatar-sunset';
 import AvatarMarble from './components/avatar-marble';
-import type { AvatarProps } from './components/types';
+import type { AvatarProps, AvatarVariant } from './components/types';
+import { normalizeAudioLevel } from './utilities';
+
+const DEFAULT_COLORS = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'];
 
 const AVATAR_VARIANTS = {
-  pixel: AvatarPixel,
-  bauhaus: AvatarBauhaus,
-  ring: AvatarRing,
-  beam: AvatarBeam,
-  sunset: AvatarSunset,
   marble: AvatarMarble,
-  geometric: AvatarBeam, // Deprecated, use 'beam'
-  abstract: AvatarBauhaus, // Deprecated, use 'bauhaus'
-};
+  beam: AvatarBeam,
+} satisfies Record<AvatarVariant, typeof AvatarMarble>;
 
 const Avatar = ({
   variant = 'marble',
-  colors = ['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90'],
+  colors = DEFAULT_COLORS,
   name = 'Clara Barton',
+  activity = 'idle',
+  audioLevel,
+  animated = true,
   title = false,
   size = '40px',
   square = false,
   ...otherProps
-}: Partial<AvatarProps> & { variant?: keyof typeof AVATAR_VARIANTS }) => {
-  const AvatarComponent = AVATAR_VARIANTS[variant] || AvatarMarble;
+}: AvatarProps) => {
+  const AvatarComponent = variant === 'beam' ? AVATAR_VARIANTS.beam : AVATAR_VARIANTS.marble;
 
   return (
     <AvatarComponent
       colors={colors}
       name={name}
+      activity={activity}
+      audioLevel={normalizeAudioLevel(audioLevel)}
+      animated={animated}
       title={title}
       size={size}
       square={square}
@@ -40,4 +39,6 @@ const Avatar = ({
   );
 };
 
+export { Avatar };
+export type { AvatarActivity, AvatarProps, AvatarVariant } from './components/types';
 export default Avatar;

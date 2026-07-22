@@ -1,59 +1,71 @@
 {
-  "name": "boring-avatars",
-  "description": "Boring avatars is a tiny JavaScript React library that generates custom, SVG-based, round avatars from any username and color palette.",
-  "homepage": "https://boringavatars.com/",
-  "version": "2.0.4",
+  "name": "@kpsuperplane/boring-avatars",
+  "description": "Deterministic Marble and Beam SVG avatars with expressive, state-driven React animation.",
+  "homepage": "https://github.com/kpsuperplane/boring-avatars#readme",
+  "version": "0.1.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/boringdesigners/boring-avatars"
+    "url": "git+https://github.com/kpsuperplane/boring-avatars.git"
   },
   "bugs": {
-    "url": "https://github.com/boringdesigners/boring-avatars/issues"
+    "url": "https://github.com/kpsuperplane/boring-avatars/issues"
   },
   "keywords": [
     "avatar",
-    "gravatar",
-    "profile picture",
-    "user avatar",
-    "avatar generator",
-    "avatar placeholder"
+    "react",
+    "svg",
+    "animated avatar",
+    "voice avatar",
+    "marble avatar",
+    "beam avatar"
   ],
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
-    "dist/*"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --p ./tsconfig.lib.json && vite build",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.lib.json --emitDeclarationOnly",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "peerDependencies": {
-    "react": ">=18.0.0",
-    "react-dom": ">=18.0.0"
+    "react": ">=18"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/node": "^25.6.2",
     "@types/react": "^19.2.14",
-    "@types/react-color": "^3.0.13",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
-    "nice-color-palettes": "^4.0.0",
+    "jsdom": "^29.1.1",
     "react": "^19.2.6",
-    "react-color": "^2.19.3",
     "react-dom": "^19.2.6",
-    "styled-components": "^6.4.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.11",
-    "vite-plugin-dts": "^5.0.0"
+    "vite-plugin-dts": "^5.0.0",
+    "vitest": "^4.1.10"
   }
 }

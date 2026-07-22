@@ -1,260 +1,169 @@
-import { useEffect, useRef, useState } from 'react';
-import styled from 'styled-components';
-import { SegmentGroup, Segment, Button, BaseStyles, ColorDot } from './ui-system';
-import colors from 'nice-color-palettes/1000.json';
-import { exampleNames } from './example-names';
-import Avatar from '../lib';
+import { useEffect, useState } from 'react';
+import Avatar, { type AvatarActivity, type AvatarVariant } from '../lib';
 
-const paletteColors = colors;
+const SIZES = [24, 40, 96, 160] as const;
+const ACTIVITIES: AvatarActivity[] = ['idle', 'listening', 'thinking', 'speaking'];
+const VARIANTS: AvatarVariant[] = ['marble', 'beam'];
+const SIMULATION = [0.08, 0.22, 0.48, 0.81, 0.58, 0.94, 0.36, 0.16, 0.67, 0.42];
+const DEFAULT_PALETTE = ['#8f9cf4', '#4d64c9', '#f4b860', '#dd6e8b', '#25224a'];
 
-const Header = styled.header`
-  display: grid;
-  grid-template-columns: auto 1fr auto auto auto auto;
-  padding: var(--pagePadding);
-  align-items: center;
-  grid-gap: var(--sp-s);
-`;
-
-const ColorsSection = styled.div`
-  display: inline-grid;
-  grid-template-columns: repeat(5, 1fr);
-  max-width: max-content;
-  grid-gap: var(--sp-xs);
-`;
-
-const Banner = styled.div`
-  background: var(--c-body);
-  color: var(--c-background);
-  padding: var(--sp-l);
-`;
-
-const AvatarsGrid = styled.div`
-  display: grid;
-  grid-gap: var(--sp-l) var(--sp-s);
-  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-  padding: var(--pagePadding);
-`;
-
-const AvatarContainer = styled.div`
-  display: grid;
-  grid-gap: var(--sp-s);
-  padding: 0 var(--sp-m);
-  font-size: 0.8rem;
-`;
-
-const AvatarSection = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-`;
-
-const Input = styled.input`
-  padding: var(--textbox);
-  font: inherit;
-  color: inherit;
-  border: 1px solid transparent;
-  transition: 0.5s;
-  width: 100%;
-  text-align: center;
-  border-radius: 100rem;
-  background: transparent;
-
-  &:hover {
-    border-color: var(--c-fieldHover);
-    transition: 0.2s;
-  }
-
-  &:focus {
-    border-color: var(--c-fieldFocus);
-    outline: none;
-  }
-`;
-
-interface AvatarWrapperProps {
-  name: string;
-  playgroundColors: string[];
-  size: number;
-  square: boolean;
-  variant: 'beam' | 'bauhaus' | 'ring' | 'sunset' | 'pixel' | 'marble';
-}
-
-const AvatarWrapper = ({ name, playgroundColors, size, square, variant }: AvatarWrapperProps) => {
-  const [avatarName, setAvatarName] = useState<string>(name);
-  const handleFocus = (event: React.FocusEvent<HTMLInputElement>) => event.target.select();
-  const ref = useRef<HTMLDivElement>(null);
-  const [copyValue, setCopyValue] = useState<string>(name);
-
-  useEffect(() => {
-    if (ref.current) {
-      const svgNode = ref.current.innerHTML;
-      const svgStart = svgNode.indexOf('<svg');
-      const svgEnd = svgNode.indexOf('</svg>') + 6;
-      const svgResult = svgNode.substring(svgStart, svgEnd).toString();
-
-      setCopyValue(svgResult);
-    }
-  }, [copyValue, variant, playgroundColors]);
-
-  return (
-    <AvatarContainer>
-      <AvatarSection className="Avatar" ref={ref}>
-        <Avatar
-          name={avatarName}
-          colors={playgroundColors}
-          size={size}
-          variant={variant}
-          square={square}
-        />
-      </AvatarSection>
-      <Input
-        value={avatarName}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAvatarName(e.target.value)}
-        onFocus={handleFocus}
-      />
-    </AvatarContainer>
-  );
-};
-
-const getRandomPaletteIndex = (): number => Math.floor(Math.random() * paletteColors.length);
-
-const avatarSizes: Record<string, number> = {
-  small: 40,
-  medium: 80,
-  large: 128,
-};
-
-const SizeDotWrapper = styled(Button)<{ isSelected: boolean }>`
-  ${(p) => (p.isSelected ? `background-color: var(--c-background)` : null)};
-  ${(p) => !p.isSelected && `color: var(--c-fade)`};
-
-  &:hover {
-    ${(p) => p.isSelected && `background-color: var(--c-background)`};
-  }
-`;
-
-const Dot = styled.div<{ size: number }>`
-  width: ${(p) => p.size}px;
-  height: ${(p) => p.size}px;
-  background-color: currentColor;
-  border-radius: 10rem;
-`;
-
-const SizeDot = ({
-  size,
-  isSelected,
-  onClick,
+const Segment = <T extends string>({
+  options,
+  value,
+  onChange,
 }: {
-  size: number;
-  isSelected: boolean;
-  onClick?: () => void;
-}) => {
-  const getSize = () => {
-    switch (size) {
-      case avatarSizes.small:
-        return 8;
-      case avatarSizes.medium:
-        return 14;
-      case avatarSizes.large:
-        return 20;
-      default:
-        return 0;
-    }
-  };
-  return <SizeDotWrapper isSelected={isSelected} icon={<Dot size={getSize()} />} onClick={onClick} />;
-};
+  options: T[];
+  value: T;
+  onChange: (value: T) => void;
+}) => (
+  <div className="segment">
+    {options.map((option) => (
+      <button
+        type="button"
+        className={option === value ? 'selected' : ''}
+        onClick={() => onChange(option)}
+        key={option}
+      >
+        {option}
+      </button>
+    ))}
+  </div>
+);
 
 export const Playground = () => {
-  const defaultPlaygroundColors = paletteColors[493];
-  const [playgroundColors, setPlaygroundColors] = useState(defaultPlaygroundColors);
-
-  const [dotColor0, setDotColor0] = useState(playgroundColors[0]);
-  const [dotColor1, setDotColor1] = useState(playgroundColors[1]);
-  const [dotColor2, setDotColor2] = useState(playgroundColors[2]);
-  const [dotColor3, setDotColor3] = useState(playgroundColors[3]);
-  const [dotColor4, setDotColor4] = useState(playgroundColors[4]);
-
-  const filteredColors = [dotColor0, dotColor1, dotColor2, dotColor3, dotColor4];
-
-  const handleRandomColors = () => {
-    setPlaygroundColors(paletteColors[getRandomPaletteIndex()]);
-  };
+  const [name, setName] = useState('Clara Barton');
+  const [colors, setColors] = useState(DEFAULT_PALETTE);
+  const [variant, setVariant] = useState<AvatarVariant>('marble');
+  const [activity, setActivity] = useState<AvatarActivity>('idle');
+  const [animated, setAnimated] = useState(true);
+  const [square, setSquare] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0.48);
+  const [simulating, setSimulating] = useState(false);
 
   useEffect(() => {
-    setDotColor0(playgroundColors[0]);
-    setDotColor1(playgroundColors[1]);
-    setDotColor2(playgroundColors[2]);
-    setDotColor3(playgroundColors[3]);
-    setDotColor4(playgroundColors[4]);
-  }, [playgroundColors]);
+    if (!simulating) return;
 
-  const [avatarSize, setAvatarSize] = useState(avatarSizes.medium);
-  const [variant, setVariant] = useState<AvatarWrapperProps['variant']>('beam');
-  const [isSquare, setSquare] = useState(false);
+    let step = 0;
+    let timeout = 0;
+    const advance = () => {
+      setAudioLevel(SIMULATION[step % SIMULATION.length]);
+      step += 1;
+      timeout = window.setTimeout(advance, 190);
+    };
+    advance();
+    return () => window.clearTimeout(timeout);
+  }, [simulating]);
+
+  const updateColor = (index: number, value: string) => {
+    setColors((current) => current.map((color, colorIndex) => (colorIndex === index ? value : color)));
+  };
 
   return (
-    <>
-      <BaseStyles />
-      <Banner>
-        This is a playground to test local changes and not the one used in{' '}
-        <a style={{ color: 'white' }} href="https://boringavatars.com">
-          boringavatars.com
-        </a>{' '}
-        . For suggestions, issues or PR's go to the{' '}
-        <a
-          style={{ color: 'white' }}
-          href="http://www.github.com/boringdesigners/boring-avatars-playground"
-        >
-          playground repository
-        </a>
-      </Banner>
-      .
-      <Header>
-        <SegmentGroup>
-          {(['beam', 'bauhaus', 'ring', 'sunset', 'pixel', 'marble'] as const).map(
-            (variantItem, i) => (
-              <Segment
-                key={i}
-                onClick={() => setVariant(variantItem)}
-                isSelected={variantItem === variant}
-              >
-                {variantItem}
-              </Segment>
-            ),
-          )}
-        </SegmentGroup>
-        <ColorsSection>
-          <ColorDot value={dotColor0} onChange={(color) => setDotColor0(color)} />
-          <ColorDot value={dotColor1} onChange={(color) => setDotColor1(color)} />
-          <ColorDot value={dotColor2} onChange={(color) => setDotColor2(color)} />
-          <ColorDot value={dotColor3} onChange={(color) => setDotColor3(color)} />
-          <ColorDot value={dotColor4} onChange={(color) => setDotColor4(color)} />
-        </ColorsSection>
+    <main>
+      <header className="intro">
+        <p className="eyebrow">@kpsuperplane/boring-avatars</p>
+        <h1>Motion playground</h1>
+        <p>Deterministic SVG identities with expressive, state-driven motion.</p>
+      </header>
 
-        <Button onClick={() => handleRandomColors()}>Random palette</Button>
-        <Button onClick={() => setSquare(!isSquare)}>{isSquare ? 'Round' : 'Square'}</Button>
-        <SegmentGroup>
-          {Object.entries(avatarSizes).map(([, value], index) => (
-            <SizeDot
-              key={index}
-              onClick={() => setAvatarSize(value)}
-              isSelected={value === avatarSize}
-              size={value}
+      <section className="workspace">
+        <aside className="controls" aria-label="Avatar controls">
+          <label>
+            <span>Name</span>
+            <input value={name} onChange={(event) => setName(event.target.value)} />
+          </label>
+
+          <fieldset>
+            <legend>Palette</legend>
+            <div className="palette">
+              {colors.map((color, index) => (
+                <label className="color-control" key={index} title={`Color ${index + 1}`}>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(event) => updateColor(index, event.target.value)}
+                  />
+                  <span>{color}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Variant</legend>
+            <Segment options={VARIANTS} value={variant} onChange={setVariant} />
+          </fieldset>
+
+          <fieldset>
+            <legend>Activity</legend>
+            <Segment options={ACTIVITIES} value={activity} onChange={setActivity} />
+          </fieldset>
+
+          <label className="range-control">
+            <span>
+              Audio level <output>{audioLevel.toFixed(2)}</output>
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={audioLevel}
+              onChange={(event) => {
+                setSimulating(false);
+                setAudioLevel(Number(event.target.value));
+              }}
             />
+          </label>
+
+          <div className="button-row">
+            <button type="button" className="action" onClick={() => setSimulating((value) => !value)}>
+              {simulating ? 'Stop level simulation' : 'Start level simulation'}
+            </button>
+          </div>
+
+          <div className="toggle-row">
+            <label>
+              <input
+                type="checkbox"
+                checked={animated}
+                onChange={(event) => setAnimated(event.target.checked)}
+              />
+              Animated
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={square}
+                onChange={(event) => setSquare(event.target.checked)}
+              />
+              Square mask
+            </label>
+          </div>
+          <p className="hint">The simulator repeats the same level sequence. System reduced-motion settings always win.</p>
+        </aside>
+
+        <section className="previews" aria-label="Avatar previews">
+          {SIZES.map((size) => (
+            <article className="preview" key={size}>
+              <div className="avatar-stage">
+                <Avatar
+                  name={name}
+                  colors={colors}
+                  variant={variant}
+                  activity={activity}
+                  audioLevel={audioLevel}
+                  animated={animated}
+                  square={square}
+                  size={size}
+                  title
+                />
+              </div>
+              <p>{size}px</p>
+            </article>
           ))}
-        </SegmentGroup>
-      </Header>
-      <AvatarsGrid>
-        {exampleNames.map((exampleName, name) => (
-          <AvatarWrapper
-            key={name}
-            size={avatarSize}
-            square={isSquare}
-            name={exampleName}
-            playgroundColors={filteredColors}
-            variant={variant}
-          />
-        ))}
-      </AvatarsGrid>
-    </>
+        </section>
+      </section>
+    </main>
   );
 };

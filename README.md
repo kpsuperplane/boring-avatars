@@ -1,87 +1,71 @@
-# Boring avatars
+# @kpsuperplane/boring-avatars
 
-Boring avatars is an open source React library and a subscription-based service that generates unique SVG-based user profile avatars from usernames, emails or any random strings.
+A small React library for deterministic, SVG-based avatars with expressive activity states. It includes two variants: the fluid **Marble** and the spherical **Beam** character.
 
-<a href="https://www.npmjs.com/package/boring-avatars">
-
-![hi](https://badgen.net/npm/v/boring-avatars)
-
-</a>
+This project is a fork of [boringdesigners/boring-avatars](https://github.com/boringdesigners/boring-avatars). The original design, deterministic identity approach, and MIT license are retained with attribution.
 
 ## Install
 
+```sh
+npm install @kpsuperplane/boring-avatars
 ```
-npm install boring-avatars
-```
+
+React 18 or newer is required.
 
 ## Usage
 
-```jsx
-import Avatar from 'boring-avatars';
+```tsx
+import Avatar, { type AvatarActivity } from '@kpsuperplane/boring-avatars';
 
-<Avatar name="Maria Mitchell" />;
+const activity: AvatarActivity = 'listening';
+
+<Avatar
+  name="Maria Mitchell"
+  variant="marble"
+  activity={activity}
+  audioLevel={0.62}
+  size={96}
+  title
+/>;
 ```
 
-### Props
+The default export is also available as the named `Avatar` export. `AvatarProps`, `AvatarVariant`, and `AvatarActivity` are exported as public types.
 
-| Prop    | Type                                                         | Default                                                   |
-|---------|--------------------------------------------------------------|-----------------------------------------------------------|
-| size    | number or string                                             | `40px`                                                    |
-| square  | boolean                                                      | `false`                                                   |
-| title   | boolean                                                      | `false`                                                   |
-| name    | string                                                       | `Clara Barton`                                            |
-| variant | oneOf: `marble`, `beam`, `pixel`,`sunset`, `ring`, `bauhaus` | `marble`                                                  |
-| colors  | array                                                        | `['#92A1C6', '#146A7C', '#F0AB3D', '#C271B4', '#C20D90']` |
+## API
 
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | `"Clara Barton"` | Seeds colors, geometry, and motion timing. |
+| `colors` | `string[]` | built-in five-color palette | Palette used to build the identity. |
+| `variant` | `"marble" \| "beam"` | `"marble"` | Selects the avatar design. |
+| `activity` | `"idle" \| "listening" \| "thinking" \| "speaking"` | `"idle"` | Selects the representative pose and motion language. |
+| `audioLevel` | `number` | deterministic fallback pulse | Drives listening and speaking response; finite values are clamped to `0…1`, and non-finite values become `0`. |
+| `animated` | `boolean` | `true` | Enables motion when the operating system does not request reduced motion. |
+| `size` | `number \| string` | `"40px"` | Sets SVG width and height. |
+| `square` | `boolean` | `false` | Uses a square outer mask. Beam remains spherical inside it. |
+| `title` | `boolean` | `false` | Adds an SVG `<title>` containing the name. |
 
-#### Name
-The `name` prop is used to generate the avatar. It can be the username, email or any random string.
+Standard SVG props are passed through to the root element.
 
-```jsx
-<Avatar name="Maria Mitchell"/>
+```tsx
+import { Avatar } from '@kpsuperplane/boring-avatars';
+
+<Avatar
+  name="Grace Hopper"
+  colors={['#fb6900', '#f63700', '#004853', '#007e80', '#00b9bd']}
+  variant="beam"
+  activity="speaking"
+  className="voice-avatar"
+  aria-label="Grace Hopper is speaking"
+/>;
 ```
 
-#### Variant
-The `variant` prop is used to change the theme of the avatar. The available variants are: `marble`, `beam`, `pixel`, `sunset`, `ring` and `bauhaus`.
+## Motion and accessibility
 
-```jsx
-<Avatar name="Alice Paul" variant="beam"/>
-```
+Animation starts in the browser after hydration, uses the Web Animations API, and is cancelled when state changes or the component unmounts. `animated={false}` and `prefers-reduced-motion: reduce` leave each activity in a stable representative pose. The library does not request microphone access; applications can provide their own normalized audio level when appropriate.
 
-#### Size
-The `size` prop is used to change the size of the avatar.
+The same name and palette always produce the same base SVG and seeded animation cadence.
 
-```jsx
-<Avatar name="Ada Lovelace" size={88}/>
-```
+## License
 
-#### Colors
-The `colors` prop is used to change the color palette of the avatar.
-
-```jsx
-<Avatar name="Grace Hopper" colors={["#fb6900", "#f63700", "#004853", "#007e80", "#00b9bd"]}/>
-```
-
-#### Square
-The `square` prop is used to make the avatar square.
-
-```jsx
-<Avatar name="Helen Keller" square/>
-```
-
-## API service
-
-If you need to generate avatars on a large scale or if you just want to avoid using the React library, we offer a subscription plan for our API service.
-
-
- [Gumroad subscription](https://boringdesigners.gumroad.com/l/boring-avatars-service).
-
-## Sponsors
-
-[![TestMu AI](assets/testmu-ai-logo.png)](https://www.testmuai.com)
-
-Boring avatars is generously sponsored by [TestMu AI](https://www.testmuai.com).
-
-TestMu AI (formerly LambdaTest) is the world's first full-stack agentic AI quality engineering platform. Autonomous AI agents plan, author, execute, analyze, and optimize tests with humans in the loop, across 3,000+ browser/OS combinations and 10,000+ real devices. Trusted by 18,000+ enterprises including Microsoft, OpenAI, NVIDIA, and Vimeo.
-
-Explore the platform: https://www.testmuai.com
+MIT. The original copyright notice from boringdesigners is preserved in [LICENSE](LICENSE).

@@ -5,7 +5,13 @@ import { resolve } from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), dts({ tsconfigPath: './tsconfig.lib.json', include: ['src/lib'] })],
+  plugins: [
+    react(),
+    dts({
+      tsconfigPath: './tsconfig.lib.json',
+      include: ['src/lib/index.tsx', 'src/lib/components/types.ts'],
+    }),
+  ],
   build: {
     lib: {
       entry: resolve(__dirname, 'src/lib/index.tsx'),
